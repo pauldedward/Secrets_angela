@@ -9,7 +9,7 @@ const session = require("express-session");
 const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const findOrCreate = require('mongoose-findorcreate');
+
 
 
  const { Schema } = mongoose;
@@ -20,7 +20,7 @@ app.use(express.static("public"));
 app.set("view engine", "ejs");
 app.use( bodyParser.urlencoded({extended: true}));
 app.use(session({
-    secret: "iminlove",
+    secret: process.env.SECRET,
     resave: false,
     saveUninitialized: false,
 }));
@@ -39,7 +39,6 @@ const userScema = new Schema({
 });
 
 userScema.plugin(passportLocalMongoose);
-userScema.plugin(findOrCreate);
 
 const User = new mongoose.model("User", userScema);
 
@@ -61,9 +60,24 @@ passport.use(new GoogleStrategy({
   },
   function(accessToken, refreshToken, profile, cb) {
       console.log(profile);
-    User.findOrCreate({ googleId: profile.id }, function (err, user) {
-      return cb(err, user);
-    });
+      User.findOne( {googleId : profile.id}, function( err, foundUser ){
+      if( !err ){                                                          //Check for any errors
+          if( foundUser ){                                          // Check for if we found any users
+              return cb( null, foundUser );                  //Will return the foundUser
+          }else {                                                        //Create a new User
+              const newUser = new User({
+                  googleId : profile.id
+              });
+              newUser.save( function( err ){
+                  if(!err){
+                      return cb(null, newUser);                //return newUser
+                  }
+              });
+          }
+      }else{
+          console.log( err );
+      }
+  });
   }
 ));
 
